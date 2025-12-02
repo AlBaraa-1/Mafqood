@@ -29,20 +29,17 @@ export default function SettingsScreen() {
   const handleLanguageToggle = async () => {
     const newLang = language === 'en' ? 'ar' : 'en';
     
-    // Show restart prompt for RTL change
-    Alert.alert(
-      language === 'en' ? 'تغيير اللغة' : 'Change Language',
-      language === 'en' 
-        ? 'سيتم تغيير اللغة إلى العربية. قد تحتاج إلى إعادة تشغيل التطبيق للحصول على التخطيط الصحيح.'
-        : 'Language will change to English. You may need to restart the app for proper layout.',
-      [
-        { text: t('cancel'), style: 'cancel' },
-        { 
-          text: language === 'en' ? 'تغيير' : 'Change',
-          onPress: () => setLanguage(newLang),
-        },
-      ]
-    );
+    // Change language immediately
+    await setLanguage(newLang);
+    
+    // Show info about RTL
+    if (newLang === 'ar') {
+      Alert.alert(
+        'تم تغيير اللغة',
+        'قد تحتاج إلى إعادة تشغيل التطبيق للحصول على التخطيط الصحيح من اليمين لليسار.',
+        [{ text: 'حسناً' }]
+      );
+    }
   };
 
   const handleResetData = () => {
