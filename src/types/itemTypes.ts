@@ -37,10 +37,12 @@ export interface ItemWithMatches {
 }
 
 export interface HistoryResponse {
-  lost_items: ItemWithMatches[];
-  found_items: ItemWithMatches[];
-  lost: ItemInDBBase[];
-  found: ItemInDBBase[];
+  // New API format
+  lost_items?: ItemWithMatches[] | ItemInDBBase[];
+  found_items?: ItemWithMatches[] | ItemInDBBase[];
+  // Legacy format (for backward compatibility)
+  lost?: ItemInDBBase[];
+  found?: ItemInDBBase[];
 }
 
 // Form/Submit Types
