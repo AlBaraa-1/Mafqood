@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
 import { colors, borderRadius, typography, spacing, shadows, layout } from '../theme/theme';
 import { useLanguage } from '../context/LanguageContext';
 import { ItemFormData, whereOptions, whenOptions, MatchResult, Match, BottomTabParamList } from '../types/itemTypes';
@@ -38,6 +39,7 @@ export default function ReportItemScreen() {
   const { t } = useLanguage();
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RouteParams, 'Report'>>();
+  const queryClient = useQueryClient();
   
   // Get initial type from navigation params
   const initialType = route.params?.type || 'lost';
@@ -142,6 +144,9 @@ export default function ReportItemScreen() {
       const response = await submitFn(payload);
       setMatches(response.matches);
       setShowSuccessModal(true);
+
+      // Invalidate history cache so Matches screen shows new data
+      queryClient.invalidateQueries({ queryKey: ['history'] });
 
       // Reset form
       setFormData({
