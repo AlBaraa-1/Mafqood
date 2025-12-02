@@ -59,11 +59,17 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
 
   const setLanguage = async (newLang: SupportedLanguage) => {
     try {
-      await AsyncStorage.setItem(LANGUAGE_KEY, newLang);
+      // Update state immediately for responsive UI
       setLang(newLang);
       updateRTL(newLang);
+      
+      // Persist to storage
+      await AsyncStorage.setItem(LANGUAGE_KEY, newLang);
+      console.log('Language changed to:', newLang);
     } catch (error) {
       console.error('Error saving language:', error);
+      // Revert on error
+      setLang(lang);
     }
   };
 
