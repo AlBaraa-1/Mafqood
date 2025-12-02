@@ -22,7 +22,7 @@ import { colors, borderRadius, typography, spacing, shadows, layout } from '../t
 import { useLanguage } from '../context/LanguageContext';
 import { fetchHistory, buildImageUrl } from '../api/client';
 import { MATCH_THRESHOLD, HIGH_MATCH_THRESHOLD } from '../api/config';
-import { ItemInDBBase, Match, Item as ItemType, RootStackParamList } from '../types/itemTypes';
+import { ItemInDBBase, Match, Item as ItemType, RootStackParamList, MatchResult, ItemWithMatches as BackendItemWithMatches } from '../types/itemTypes';
 import { Screen, SegmentedControl } from '../components/ui';
 import { SimpleHeader } from '../components/ui/Header';
 import ItemCard from '../components/ItemCard';
@@ -64,35 +64,32 @@ export default function MatchesScreen() {
   });
 
   // Convert backend matches to app Match type
-  const convertToMatch = (item: ItemInDBBase, oppositeType: 'lost' | 'found', similarity: number): Match => ({
-    id: item.id.toString(),
-    item: convertToItem(item, oppositeType),
-    similarity: Math.round(similarity * 100),
-    status: similarity >= HIGH_MATCH_THRESHOLD ? 'high' : 'possible',
+  const convertMatchResult = (matchResult: MatchResult, oppositeType: 'lost' | 'found'): Match => ({
+    id: matchResult.item.id.toString(),
+    item: convertToItem(matchResult.item, oppositeType),
+    similarity: Math.round(matchResult.similarity * 100),
+    status: matchResult.similarity >= HIGH_MATCH_THRESHOLD ? 'high' : 'possible',
   });
 
-  // Get items with their matches
+  // Get items with their matches from backend response
   const getItemsWithMatches = (type: 'lost' | 'found'): ItemWithMatches[] => {
     if (!history) return [];
 
-    const items: ItemInDBBase[] = type === 'lost' ? (history.lost || []) : (history.found || []);
-    const oppositeItems: ItemInDBBase[] = type === 'lost' ? (history.found || []) : (history.lost || []);
+    // Support both API formats: lost_items/found_items (new) and lost/found (legacy)
+    const rawItems = type === 'lost' 
+      ? (history.lost_items || history.lost || [])
+      : (history.found_items || history.found || []);
     const oppositeType: 'lost' | 'found' = type === 'lost' ? 'found' : 'lost';
 
-    return items.map((item: ItemInDBBase) => {
-      const matches: Match[] = [];
-      
-      oppositeItems.forEach((oppositeItem: ItemInDBBase) => {
-        const locationMatch = item.location_type === oppositeItem.location_type;
-        const timeMatch = item.time_frame === oppositeItem.time_frame;
-        
-        if (locationMatch || timeMatch) {
-          const similarity = (locationMatch ? 0.5 : 0) + (timeMatch ? 0.3 : 0) + 0.2;
-          if (similarity >= MATCH_THRESHOLD) {
-            matches.push(convertToMatch(oppositeItem, oppositeType, similarity));
-          }
-        }
-      });
+    return rawItems.map((rawItem: any) => {
+      // Check if this is the new format (ItemWithMatches) or legacy format (ItemInDBBase)
+      const item: ItemInDBBase = rawItem.item ? rawItem.item : rawItem;
+      const backendMatches: MatchResult[] = rawItem.matches || [];
+
+      // Convert backend matches to frontend format, filtering by threshold
+      const matches: Match[] = backendMatches
+        .filter((m: MatchResult) => m.similarity >= MATCH_THRESHOLD)
+        .map((m: MatchResult) => convertMatchResult(m, oppositeType));
 
       return {
         ...convertToItem(item, type),
