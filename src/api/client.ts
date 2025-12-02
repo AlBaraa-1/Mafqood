@@ -3,6 +3,7 @@
  * Mirrors frontend/src/api/lostFoundApi.ts with React Native adaptations
  */
 
+import { Platform } from 'react-native';
 import { API_BASE_URL, ENDPOINTS } from './config';
 import {
   SubmitItemPayload,
@@ -34,17 +35,47 @@ export function buildImageUrl(imageUrl: string): string {
 }
 
 /**
- * Build FormData for submitting an item (React Native version)
+ * Build FormData for submitting an item
+ * Handles both web and native platforms
  */
-function buildFormData(payload: SubmitItemPayload): FormData {
+async function buildFormData(payload: SubmitItemPayload): Promise<FormData> {
   const formData = new FormData();
   
-  // Append image file (React Native format)
-  formData.append('file', {
-    uri: payload.file.uri,
-    name: payload.file.name,
-    type: payload.file.type,
-  } as any);
+  // Handle file differently for web vs native
+  if (Platform.OS === 'web') {
+    // Web: Fetch the blob from the URI and create a File object
+    const response = await fetch(payload.file.uri);
+    const blob = await response.blob();
+    
+    // Determine the correct MIME type and extension
+    // Use the blob's type if available, otherwise fall back to payload type
+    const mimeType = blob.type || payload.file.type || 'image/jpeg';
+    
+    // Map MIME type to extension (backend only allows these)
+    const extMap: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/jpg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+    };
+    const ext = extMap[mimeType] || '.jpg';
+    
+    // Ensure filename has correct extension
+    let filename = payload.file.name;
+    if (!filename.match(/\.(jpg|jpeg|png|webp)$/i)) {
+      filename = `photo_${Date.now()}${ext}`;
+    }
+    
+    const file = new File([blob], filename, { type: mimeType });
+    formData.append('file', file);
+  } else {
+    // React Native: Use the { uri, name, type } format
+    formData.append('file', {
+      uri: payload.file.uri,
+      name: payload.file.name,
+      type: payload.file.type,
+    } as any);
+  }
   
   formData.append('title', payload.title);
   
@@ -67,14 +98,12 @@ function buildFormData(payload: SubmitItemPayload): FormData {
  * Submit a lost item report and get AI-suggested matches.
  */
 export async function submitLostItem(payload: SubmitItemPayload): Promise<LostItemResponse> {
-  const formData = buildFormData(payload);
+  const formData = await buildFormData(payload);
   
   const response = await fetch(`${API_BASE_URL}${ENDPOINTS.LOST}`, {
     method: 'POST',
     body: formData,
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+    // Don't set Content-Type header - let fetch set it automatically with boundary
   });
   
   if (!response.ok) {
@@ -90,14 +119,12 @@ export async function submitLostItem(payload: SubmitItemPayload): Promise<LostIt
  * Submit a found item report and get AI-suggested matches.
  */
 export async function submitFoundItem(payload: SubmitItemPayload): Promise<FoundItemResponse> {
-  const formData = buildFormData(payload);
+  const formData = await buildFormData(payload);
   
   const response = await fetch(`${API_BASE_URL}${ENDPOINTS.FOUND}`, {
     method: 'POST',
     body: formData,
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+    // Don't set Content-Type header - let fetch set it automatically with boundary
   });
   
   if (!response.ok) {
