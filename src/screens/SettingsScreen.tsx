@@ -1,7 +1,6 @@
 /**
  * Mafqood Mobile - Settings Screen
- * Language toggle, privacy, data management
- * Native-first design - clean and functional
+ * Enhanced with brand logo, AI tech info, language toggle, privacy, data management
  */
 
 import React from 'react';
@@ -12,19 +11,22 @@ import {
   TouchableOpacity,
   Linking,
   Alert,
+  Image,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, borderRadius, typography, spacing, shadows, layout } from '../theme/theme';
 import { useLanguage } from '../context/LanguageContext';
 import { resetDatabase } from '../api/client';
-import { Screen, Section } from '../components/ui';
-import { SimpleHeader } from '../components/ui/Header';
+import { Screen, Section, Card } from '../components/ui';
 
 export default function SettingsScreen() {
   const { t, language, setLanguage } = useLanguage();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
 
   const handleLanguageToggle = async () => {
     const newLang = language === 'en' ? 'ar' : 'en';
@@ -53,11 +55,8 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Clear server data
               await resetDatabase();
-              // Clear local cache
               await AsyncStorage.clear();
-              // Invalidate queries
               await queryClient.invalidateQueries();
               Alert.alert(t('success'), t('settings_reset_success'));
             } catch (error) {
@@ -79,11 +78,30 @@ export default function SettingsScreen() {
 
   return (
     <Screen backgroundColor={colors.background.secondary} statusBarStyle="dark-content">
-      {/* Header */}
-      <SimpleHeader title={t('settings_title')} />
+      {/* Brand Header */}
+      <LinearGradient
+        colors={[colors.primary.dark, '#0D3847']}
+        style={[styles.brandHeader, { paddingTop: insets.top + spacing.md }]}
+      >
+        <View style={styles.logoContainer}>
+          <Image 
+            source={require('../../assets/Mafqood.png')} 
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+        <Text style={styles.brandTitle}>{t('app_title')}</Text>
+        <Text style={styles.brandTagline}>{t('tagline')}</Text>
+        
+        {/* AI Badge */}
+        <View style={styles.aiBadge}>
+          <Ionicons name="sparkles" size={12} color={colors.primary.accent} />
+          <Text style={styles.aiBadgeText}>{t('badge_ai')}</Text>
+        </View>
+      </LinearGradient>
 
       {/* Language Section */}
-      <Section title={t('settings_language')}>
+      <Section title={t('settings_language')} style={styles.section}>
         <TouchableOpacity style={styles.languageCard} onPress={handleLanguageToggle}>
           <View style={styles.languageRow}>
             {/* English */}
@@ -129,8 +147,47 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </Section>
 
+      {/* About Mafqood Section */}
+      <Section title={t('settings_about_title')} style={styles.section}>
+        <Card variant="default" padding="md">
+          <View style={styles.aboutRow}>
+            <View style={[styles.aboutIcon, { backgroundColor: colors.primary.dark + '15' }]}>
+              <Ionicons name="information-circle" size={20} color={colors.primary.dark} />
+            </View>
+            <View style={styles.aboutContent}>
+              <Text style={styles.aboutText}>{t('settings_about_text')}</Text>
+            </View>
+          </View>
+          
+          {/* AI Technology Info */}
+          <View style={styles.techDivider} />
+          <View style={styles.aboutRow}>
+            <View style={[styles.aboutIcon, { backgroundColor: colors.primary.accent + '15' }]}>
+              <Ionicons name="eye" size={20} color={colors.primary.accent} />
+            </View>
+            <View style={styles.aboutContent}>
+              <Text style={styles.techTitle}>{t('ai_powered_title')}</Text>
+              <Text style={styles.techDesc}>{t('ai_powered_subtitle')}</Text>
+            </View>
+          </View>
+          
+          <View style={styles.featuresRow}>
+            {[
+              { icon: 'scan', text: t('ai_feature_visual') },
+              { icon: 'analytics', text: t('ai_feature_similarity') },
+              { icon: 'shield-checkmark', text: t('ai_feature_privacy') },
+            ].map((feature, index) => (
+              <View key={index} style={styles.featureChip}>
+                <Ionicons name={feature.icon as any} size={12} color={colors.primary.accent} />
+                <Text style={styles.featureText}>{feature.text}</Text>
+              </View>
+            ))}
+          </View>
+        </Card>
+      </Section>
+
       {/* Legal Section */}
-      <Section title={t('settings_privacy')}>
+      <Section title={t('settings_privacy')} style={styles.section}>
         <View style={styles.menuCard}>
           <TouchableOpacity style={styles.menuItem} onPress={handleOpenPrivacy}>
             <View style={styles.menuItemLeft}>
@@ -157,7 +214,7 @@ export default function SettingsScreen() {
       </Section>
 
       {/* Data Section */}
-      <Section title={t('settings_data')}>
+      <Section title={t('settings_data')} style={styles.section}>
         <TouchableOpacity style={styles.dangerCard} onPress={handleResetData}>
           <View style={styles.menuItemLeft}>
             <View style={[styles.menuIcon, { backgroundColor: colors.status.errorBg }]}>
@@ -172,17 +229,76 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </Section>
 
-      {/* About Footer */}
-      <View style={styles.aboutFooter}>
-        <Text style={styles.aboutLogo}>🔍 Mafqood</Text>
-        <Text style={styles.aboutTagline}>{t('tagline')}</Text>
-        <Text style={styles.aboutMeta}>v1.0.0 • {t('footer_rights')}</Text>
+      {/* Footer */}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>v1.0.0</Text>
+        <Text style={styles.footerDot}>•</Text>
+        <Text style={styles.footerText}>{t('footer_rights')}</Text>
+      </View>
+      
+      {/* Prototype Banner */}
+      <View style={styles.prototypeBanner}>
+        <Text style={styles.prototypeText}>{t('home_footer')}</Text>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  // Brand Header
+  brandHeader: {
+    alignItems: 'center',
+    paddingBottom: spacing.xl,
+    marginBottom: spacing.md,
+    borderBottomLeftRadius: borderRadius.xxl,
+    borderBottomRightRadius: borderRadius.xxl,
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.background.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+    ...shadows.lg,
+  },
+  logo: {
+    width: 56,
+    height: 56,
+  },
+  brandTitle: {
+    fontSize: typography.sizes.xxl,
+    fontWeight: typography.weights.bold,
+    color: colors.text.white,
+    marginBottom: spacing.xs,
+  },
+  brandTagline: {
+    fontSize: typography.sizes.sm,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  aiBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+  },
+  aiBadgeText: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.white,
+  },
+
+  section: {
+    marginTop: spacing.xs,
+  },
+
   // Language
   languageCard: {
     backgroundColor: colors.background.primary,
@@ -228,6 +344,62 @@ const styles = StyleSheet.create({
     color: colors.text.light,
     textAlign: 'center',
     marginTop: spacing.sm,
+  },
+
+  // About
+  aboutRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  aboutIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aboutContent: {
+    flex: 1,
+  },
+  aboutText: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    lineHeight: 20,
+  },
+  techDivider: {
+    height: 1,
+    backgroundColor: colors.border.light,
+    marginVertical: spacing.md,
+  },
+  techTitle: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  techDesc: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
+  },
+  featuresRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+  },
+  featureChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary.accent + '10',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+  },
+  featureText: {
+    fontSize: 10,
+    color: colors.primary.accent,
+    fontWeight: typography.weights.medium,
   },
 
   // Menu
@@ -291,25 +463,36 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // About
-  aboutFooter: {
+  // Footer
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: spacing.xl,
-    marginTop: spacing.lg,
+    gap: spacing.xs,
   },
-  aboutLogo: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  aboutTagline: {
-    fontSize: typography.sizes.sm,
-    color: colors.text.secondary,
-    marginBottom: spacing.sm,
-  },
-  aboutMeta: {
+  footerText: {
     fontSize: typography.sizes.xs,
     color: colors.text.light,
+  },
+  footerDot: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.light,
+  },
+  prototypeBanner: {
+    backgroundColor: colors.primary.dark + '08',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.lg,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary.dark + '15',
+  },
+  prototypeText: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.light,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });
