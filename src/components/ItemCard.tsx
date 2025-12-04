@@ -1,10 +1,11 @@
 /**
  * Mafqood Mobile - Item Card Component
- * Displays reported items with their matches
+ * Enhanced display with larger images, colored badges, and subtle shadows
  */
 
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, borderRadius, fontSize, fontWeight, spacing, shadows } from '../theme/theme';
 import { Item, Match } from '../types/itemTypes';
@@ -20,7 +21,10 @@ interface ItemCardProps {
 export default function ItemCard({ item, matches, onMatchPress }: ItemCardProps) {
   const { t } = useLanguage();
 
+  const isLost = item.type === 'lost';
   const hasHighMatch = matches.some(m => m.similarity >= 75);
+  const accentColor = isLost ? colors.primary.dark : colors.primary.accent;
+  
   const formattedDate = item.timestamp.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -34,65 +38,85 @@ export default function ItemCard({ item, matches, onMatchPress }: ItemCardProps)
     ]}>
       {/* High Match Indicator */}
       {hasHighMatch && (
-        <View style={styles.highMatchIndicator}>
+        <LinearGradient
+          colors={[accentColor, accentColor + 'DD']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.highMatchIndicator}
+        >
           <Ionicons name="sparkles" size={14} color={colors.text.white} />
           <Text style={styles.highMatchText}>{t('matches_high_match_badge')}</Text>
-        </View>
+        </LinearGradient>
       )}
 
       <View style={styles.content}>
-        {/* Left: Item Details */}
-        <View style={styles.itemSection}>
-          {/* Image */}
-          <Image
-            source={{ uri: item.imageUrl }}
-            style={styles.image}
-            resizeMode="cover"
-          />
+        {/* Top Section: Image + Details */}
+        <View style={styles.topSection}>
+          {/* Larger Image with Badge Overlay */}
+          <View style={styles.imageContainer}>
+            <Image
+              source={{ uri: item.imageUrl }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+            {/* Type Badge Overlay */}
+            <View style={[
+              styles.typeBadgeOverlay,
+              { backgroundColor: accentColor },
+            ]}>
+              <Ionicons 
+                name={isLost ? "search" : "hand-left"} 
+                size={10} 
+                color={colors.text.white} 
+              />
+              <Text style={styles.typeBadgeText}>
+                {isLost ? t('matches_lost_badge') : t('matches_found_badge')}
+              </Text>
+            </View>
+          </View>
 
           {/* Details */}
           <View style={styles.details}>
-            {/* Type Badge + Match Count */}
-            <View style={styles.badges}>
-              <View style={[
-                styles.typeBadge,
-                item.type === 'lost' ? styles.lostBadge : styles.foundBadge,
-              ]}>
-                <Text style={styles.typeBadgeText}>
-                  {item.type === 'lost' ? `🔍 ${t('matches_lost_badge')}` : `✅ ${t('matches_found_badge')}`}
+            {/* Match Count Badge */}
+            {matches.length > 0 && (
+              <View style={[styles.matchCountBadge, { borderColor: accentColor + '40' }]}>
+                <Ionicons name="git-compare" size={12} color={accentColor} />
+                <Text style={[styles.matchCountText, { color: accentColor }]}>
+                  {matches.length} {matches.length === 1 ? t('matches_match_count') : t('matches_match_count_plural')}
                 </Text>
               </View>
-              {matches.length > 0 && (
-                <View style={styles.matchCountBadge}>
-                  <Text style={styles.matchCountText}>
-                    {matches.length} {matches.length === 1 ? t('matches_match_count') : t('matches_match_count_plural')}
-                  </Text>
-                </View>
-              )}
-            </View>
+            )}
 
             {/* Description */}
             <Text style={styles.description} numberOfLines={2}>
               {item.description}
             </Text>
 
-            {/* Meta */}
-            <View style={styles.metaRow}>
-              <Ionicons name="location" size={14} color={colors.primary.accent} />
-              <Text style={styles.metaText}>{item.where}</Text>
-              {item.specificPlace && (
-                <Text style={styles.metaSubText}>• {item.specificPlace}</Text>
-              )}
-            </View>
+            {/* Meta Info */}
+            <View style={styles.metaContainer}>
+              <View style={styles.metaRow}>
+                <View style={[styles.metaIcon, { backgroundColor: accentColor + '15' }]}>
+                  <Ionicons name="location" size={12} color={accentColor} />
+                </View>
+                <Text style={styles.metaText}>{item.where}</Text>
+                {item.specificPlace && (
+                  <Text style={styles.metaSubText} numberOfLines={1}>• {item.specificPlace}</Text>
+                )}
+              </View>
 
-            <View style={styles.metaRow}>
-              <Ionicons name="time" size={14} color={colors.primary.dark} />
-              <Text style={styles.metaText}>{item.when}</Text>
-            </View>
+              <View style={styles.metaRow}>
+                <View style={[styles.metaIcon, { backgroundColor: colors.primary.dark + '15' }]}>
+                  <Ionicons name="time" size={12} color={colors.primary.dark} />
+                </View>
+                <Text style={styles.metaText}>{item.when}</Text>
+              </View>
 
-            <View style={styles.metaRow}>
-              <Ionicons name="calendar" size={14} color={colors.primary.accent} />
-              <Text style={styles.metaSubText}>{t('matches_reported')} {formattedDate}</Text>
+              <View style={styles.metaRow}>
+                <View style={[styles.metaIcon, { backgroundColor: colors.text.tertiary + '15' }]}>
+                  <Ionicons name="calendar-outline" size={12} color={colors.text.tertiary} />
+                </View>
+                <Text style={styles.metaSubText}>{formattedDate}</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -100,24 +124,26 @@ export default function ItemCard({ item, matches, onMatchPress }: ItemCardProps)
         {/* Divider */}
         <View style={styles.divider} />
 
-        {/* Right: Matches Section */}
+        {/* Bottom: Matches Section */}
         <View style={styles.matchesSection}>
           {matches.length > 0 ? (
             <>
               <View style={styles.matchesHeader}>
                 <View style={styles.matchesTitleRow}>
-                  <Ionicons name="sparkles" size={16} color={colors.primary.accent} />
-                  <Text style={styles.matchesTitle}>{t('matches_ai_discovered')}</Text>
+                  <Ionicons name="sparkles" size={16} color={accentColor} />
+                  <Text style={[styles.matchesTitle, { color: accentColor }]}>
+                    {t('matches_ai_discovered')}
+                  </Text>
                 </View>
                 {hasHighMatch && (
-                  <View style={styles.strongSimilarityBadge}>
-                    <Text style={styles.strongSimilarityText}>⚡ Strong</Text>
+                  <View style={[styles.strongSimilarityBadge, { backgroundColor: accentColor + '15', borderColor: accentColor + '30' }]}>
+                    <Text style={[styles.strongSimilarityText, { color: accentColor }]}>⚡ Strong</Text>
                   </View>
                 )}
               </View>
 
               <View style={styles.matchesList}>
-                {matches.slice(0, 3).map((match) => (
+                {matches.slice(0, 2).map((match) => (
                   <MatchCard
                     key={match.id}
                     match={match}
@@ -127,10 +153,10 @@ export default function ItemCard({ item, matches, onMatchPress }: ItemCardProps)
                 ))}
               </View>
 
-              {matches.length > 3 && (
-                <TouchableOpacity style={styles.viewAllButton}>
-                  <Text style={styles.viewAllText}>
-                    View all {matches.length} →
+              {matches.length > 2 && (
+                <TouchableOpacity style={[styles.viewAllButton, { borderColor: accentColor + '40' }]}>
+                  <Text style={[styles.viewAllText, { color: accentColor }]}>
+                    {t('matches_view_details')} ({matches.length}) →
                   </Text>
                 </TouchableOpacity>
               )}
@@ -138,10 +164,12 @@ export default function ItemCard({ item, matches, onMatchPress }: ItemCardProps)
           ) : (
             <View style={styles.noMatches}>
               <View style={styles.noMatchesIcon}>
-                <Ionicons name="search" size={24} color={colors.text.light} />
+                <Ionicons name="search" size={20} color={colors.text.light} />
               </View>
-              <Text style={styles.noMatchesTitle}>{t('matches_no_matches_title')}</Text>
-              <Text style={styles.noMatchesDesc}>{t('matches_no_matches_desc')}</Text>
+              <View style={styles.noMatchesContent}>
+                <Text style={styles.noMatchesTitle}>{t('matches_no_matches_title')}</Text>
+                <Text style={styles.noMatchesDesc}>{t('matches_no_matches_desc')}</Text>
+              </View>
             </View>
           )}
         </View>
@@ -154,22 +182,19 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.background.primary,
     borderRadius: borderRadius.xl,
-    borderWidth: 2,
-    borderColor: colors.border.light,
     overflow: 'hidden',
-    marginBottom: spacing.lg,
     ...shadows.lg,
   },
   highlightContainer: {
-    borderColor: colors.primary.accent,
-    backgroundColor: `${colors.primary.accent}05`,
+    shadowColor: colors.primary.accent,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
   },
   highMatchIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
-    backgroundColor: colors.primary.accent,
     paddingVertical: spacing.sm,
   },
   highMatchText: {
@@ -178,90 +203,106 @@ const styles = StyleSheet.create({
     color: colors.text.white,
   },
   content: {
-    padding: spacing.lg,
+    padding: spacing.md,
   },
-  itemSection: {
+
+  // Top Section
+  topSection: {
     flexDirection: 'row',
   },
+  imageContainer: {
+    position: 'relative',
+  },
   image: {
-    width: 100,
-    height: 100,
+    width: 120,
+    height: 120,
     borderRadius: borderRadius.lg,
-    ...shadows.md,
+  },
+  typeBadgeOverlay: {
+    position: 'absolute',
+    bottom: spacing.xs,
+    left: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+  },
+  typeBadgeText: {
+    fontSize: 10,
+    fontWeight: fontWeight.bold,
+    color: colors.text.white,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   details: {
     flex: 1,
     marginLeft: spacing.md,
   },
-  badges: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  typeBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
-  },
-  lostBadge: {
-    backgroundColor: colors.primary.dark,
-  },
-  foundBadge: {
-    backgroundColor: colors.primary.accent,
-  },
-  typeBadgeText: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold,
-    color: colors.text.white,
-  },
   matchCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: 4,
     borderRadius: borderRadius.full,
-    backgroundColor: `${colors.primary.accent}15`,
+    backgroundColor: colors.background.tertiary,
     borderWidth: 1,
-    borderColor: `${colors.primary.accent}30`,
+    marginBottom: spacing.xs,
   },
   matchCountText: {
     fontSize: fontSize.xs,
     fontWeight: fontWeight.bold,
-    color: colors.primary.accent,
   },
   description: {
     fontSize: fontSize.md,
     fontWeight: fontWeight.bold,
     color: colors.text.primary,
     marginBottom: spacing.sm,
+    lineHeight: 20,
+  },
+  metaContainer: {
+    gap: spacing.xs,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    marginBottom: spacing.xs,
+  },
+  metaIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   metaText: {
     fontSize: fontSize.sm,
     color: colors.text.secondary,
-    fontWeight: fontWeight.semibold,
+    fontWeight: fontWeight.medium,
   },
   metaSubText: {
     fontSize: fontSize.sm,
     color: colors.text.tertiary,
+    flex: 1,
   },
+
+  // Divider
   divider: {
     height: 1,
     backgroundColor: colors.border.light,
-    marginVertical: spacing.lg,
+    marginVertical: spacing.md,
   },
-  matchesSection: {
-    minHeight: 100,
-  },
+
+  // Matches Section
+  matchesSection: {},
   matchesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   matchesTitleRow: {
     flexDirection: 'row',
@@ -271,62 +312,62 @@ const styles = StyleSheet.create({
   matchesTitle: {
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold,
-    color: colors.primary.dark,
   },
   strongSimilarityBadge: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: 4,
     borderRadius: borderRadius.full,
-    backgroundColor: `${colors.primary.accent}15`,
     borderWidth: 1,
-    borderColor: `${colors.primary.accent}30`,
   },
   strongSimilarityText: {
-    fontSize: fontSize.xs,
+    fontSize: 10,
     fontWeight: fontWeight.bold,
-    color: colors.primary.accent,
   },
-  matchesList: {},
+  matchesList: {
+    gap: spacing.xs,
+  },
   viewAllButton: {
     paddingVertical: spacing.sm,
     alignItems: 'center',
-    backgroundColor: `${colors.primary.accent}10`,
+    backgroundColor: colors.background.tertiary,
     borderRadius: borderRadius.lg,
     marginTop: spacing.sm,
     borderWidth: 1,
-    borderColor: `${colors.primary.accent}30`,
   },
   viewAllText: {
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold,
-    color: colors.primary.accent,
   },
+
+  // No Matches
   noMatches: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.lg,
+    padding: spacing.md,
     backgroundColor: colors.background.secondary,
     borderRadius: borderRadius.lg,
-    borderWidth: 2,
-    borderColor: colors.border.light,
+    gap: spacing.md,
   },
   noMatchesIcon: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     borderRadius: borderRadius.full,
-    backgroundColor: `${colors.primary.accent}10`,
+    backgroundColor: colors.background.tertiary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
+  },
+  noMatchesContent: {
+    flex: 1,
   },
   noMatchesTitle: {
     fontSize: fontSize.sm,
     fontWeight: fontWeight.semibold,
     color: colors.text.secondary,
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
   noMatchesDesc: {
     fontSize: fontSize.xs,
     color: colors.text.tertiary,
-    textAlign: 'center',
+    lineHeight: 16,
   },
 });

@@ -28,6 +28,7 @@ interface ImagePickerFieldProps {
   onChange: (image: { uri: string; name: string; type: string } | null) => void;
   label?: string;
   required?: boolean;
+  large?: boolean;
 }
 
 export default function ImagePickerField({
@@ -35,6 +36,7 @@ export default function ImagePickerField({
   onChange,
   label,
   required = false,
+  large = false,
 }: ImagePickerFieldProps) {
   const { t } = useLanguage();
   const [showModal, setShowModal] = useState(false);
@@ -116,7 +118,7 @@ export default function ImagePickerField({
 
       {value ? (
         <View style={styles.previewContainer}>
-          <Image source={{ uri: value.uri }} style={styles.preview} resizeMode="cover" />
+          <Image source={{ uri: value.uri }} style={[styles.preview, large && styles.previewLarge]} resizeMode="cover" />
           <View style={styles.checkBadge}>
             <Ionicons name="checkmark-circle" size={24} color={colors.status.success} />
           </View>
@@ -126,14 +128,14 @@ export default function ImagePickerField({
         </View>
       ) : (
         <TouchableOpacity
-          style={styles.uploadArea}
+          style={[styles.uploadArea, large && styles.uploadAreaLarge]}
           onPress={() => setShowModal(true)}
           activeOpacity={0.7}
         >
-          <View style={styles.uploadIconContainer}>
-            <Ionicons name="cloud-upload" size={32} color={colors.primary.accent} />
+          <View style={[styles.uploadIconContainer, large && styles.uploadIconContainerLarge]}>
+            <Ionicons name="cloud-upload" size={large ? 48 : 32} color={colors.primary.accent} />
           </View>
-          <Text style={styles.uploadText}>{t('lost_upload_click')}</Text>
+          <Text style={[styles.uploadText, large && styles.uploadTextLarge]}>{t('lost_upload_click')}</Text>
           <Text style={styles.uploadFormats}>{t('lost_upload_formats')}</Text>
         </TouchableOpacity>
       )}
@@ -208,6 +210,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.background.secondary,
   },
+  uploadAreaLarge: {
+    paddingVertical: spacing.xxl * 2,
+    borderStyle: 'dashed',
+  },
   uploadIconContainer: {
     width: 64,
     height: 64,
@@ -217,11 +223,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.lg,
   },
+  uploadIconContainerLarge: {
+    width: 88,
+    height: 88,
+    borderRadius: borderRadius.xl,
+    marginBottom: spacing.xl,
+  },
   uploadText: {
     fontSize: fontSize.md,
     fontWeight: fontWeight.medium,
     color: colors.text.primary,
     marginBottom: spacing.xs,
+  },
+  uploadTextLarge: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
   },
   uploadFormats: {
     fontSize: fontSize.sm,
@@ -235,6 +251,9 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: borderRadius.xl,
     ...shadows.lg,
+  },
+  previewLarge: {
+    height: 280,
   },
   checkBadge: {
     position: 'absolute',

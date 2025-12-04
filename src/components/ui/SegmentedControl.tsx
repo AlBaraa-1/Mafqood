@@ -73,8 +73,8 @@ export default function SegmentedControl({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: colors.background.tertiary,
-    borderRadius: borderRadius.md,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: borderRadius.lg,
     padding: 4,
     gap: 4,
   },
@@ -83,24 +83,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.sm,
+    borderRadius: borderRadius.md,
     gap: spacing.xs,
   },
   segmentSelected: {
     backgroundColor: colors.primary.dark,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   iconWrapper: {
-    marginRight: 2,
+    marginRight: 4,
   },
   label: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.md,
     fontWeight: typography.weights.medium,
-    color: colors.text.secondary,
+    color: 'rgba(255,255,255,0.7)',
   },
   labelSelected: {
     color: colors.text.white,
-    fontWeight: typography.weights.semibold,
+    fontWeight: typography.weights.bold,
   },
 });
