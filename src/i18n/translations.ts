@@ -21,7 +21,9 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     home_hero_title: 'Lost something in Dubai?',
     home_hero_subtitle: 'Upload a photo, select where and when, and let AI search for matches across the city.',
     home_cta_lost: 'Report a lost item',
+    home_cta_lost_subtitle: 'Upload a photo and tell us where and when it was lost.',
     home_cta_found: 'Report a found item',
+    home_cta_found_subtitle: "Upload a photo and we'll check if it was reported lost.",
     
     // Quick stats badges
     badge_instant: 'Instant Matching',
@@ -29,6 +31,12 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     badge_free: '100% Free',
     badge_ai: 'AI-Powered',
     badge_citywide: 'City-wide',
+
+    // Header & Stats
+    header_location: 'Dubai, UAE',
+    stats_reunited: 'Reunited',
+    stats_locations: 'Locations',
+    stats_avg_time: 'Avg Match',
 
     lost_page_title: 'Report a Lost Item',
     lost_page_subtitle: 'Upload a photo and add details. Our AI will search for matches among reported found items.',
@@ -288,6 +296,16 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     how_step3_desc: 'Receive alerts when matches are found',
     how_step4_title: 'Connect',
     how_step4_desc: 'Coordinate safe return of items',
+
+    // Multi-step form
+    report_step1_subtitle: 'Take a clear photo of the item',
+    report_step2_subtitle: 'Tell us where and when',
+    report_step3_title: 'Additional Details',
+    report_step3_subtitle: 'Add any info that helps identify the item',
+    report_photo_hint: 'Take a clear photo showing item details',
+    report_optional_hint: 'These fields are optional but help with matching',
+    next: 'Next',
+    back: 'Back',
   },
   ar: {
     app_title: 'مفقود',
@@ -304,13 +322,21 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     home_hero_title: 'أضعت شيئًا في دبي؟',
     home_hero_subtitle: 'ارفع صورة للغرض، وحدد المكان والوقت، ودع الذكاء الاصطناعي يبحث عن أقرب التطابقات.',
     home_cta_lost: 'الإبلاغ عن غرض مفقود',
+    home_cta_lost_subtitle: 'ارفع صورة وأخبرنا أين ومتى فُقد الغرض.',
     home_cta_found: 'الإبلاغ عن غرض معثور عليه',
+    home_cta_found_subtitle: 'ارفع صورة وسنتحقق إذا أُبلغ عنه كمفقود.',
 
     badge_instant: 'مطابقة فورية',
     badge_privacy: 'خصوصية أولاً',
     badge_free: 'مجاني 100%',
     badge_ai: 'مدعوم بالذكاء الاصطناعي',
     badge_citywide: 'على مستوى المدينة',
+
+    // Header & Stats
+    header_location: 'دبي، الإمارات',
+    stats_reunited: 'تم إعادتها',
+    stats_locations: 'موقع',
+    stats_avg_time: 'متوسط المطابقة',
 
     lost_page_title: 'الإبلاغ عن غرض مفقود',
     lost_page_subtitle: 'ارفع صورة للغرض وأخبرنا أين ومتى فُقد. سيبحث الذكاء الاصطناعي عن تطابقات محتملة.',
@@ -562,6 +588,16 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     how_step3_desc: 'تلقى تنبيهات عند العثور على تطابقات',
     how_step4_title: 'اتصل',
     how_step4_desc: 'نسق الإرجاع الآمن للأغراض',
+
+    // Multi-step form
+    report_step1_subtitle: 'التقط صورة واضحة للغرض',
+    report_step2_subtitle: 'حدد المكان والوقت',
+    report_step3_title: 'تفاصيل إضافية',
+    report_step3_subtitle: 'أضف أي معلومات تساعد في التعرف',
+    report_photo_hint: 'التقط صورة واضحة تظهر تفاصيل الغرض',
+    report_optional_hint: 'هذه الحقول اختيارية لكنها تساعد في المطابقة',
+    next: 'التالي',
+    back: 'رجوع',
   },
 };
 
