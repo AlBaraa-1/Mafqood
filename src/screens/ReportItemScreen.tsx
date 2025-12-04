@@ -1,49 +1,70 @@
 /**
  * Mafqood Mobile - Report Item Screen
- * Unified screen for reporting both lost and found items
- * Native-first design with clean form layout
+ * Multi-step wizard for reporting lost/found items
+ * Step 1: Photo | Step 2: Location & Time | Step 3: Details & Submit
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Alert,
+  Animated,
   Modal,
   TouchableOpacity,
   ScrollView,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, borderRadius, typography, spacing, shadows, layout } from '../theme/theme';
 import { useLanguage } from '../context/LanguageContext';
-import { ItemFormData, whereOptions, whenOptions, MatchResult, Match, BottomTabParamList } from '../types/itemTypes';
+import { ItemFormData, whereOptions, whenOptions, MatchResult, Match } from '../types/itemTypes';
 import { submitLostItem, submitFoundItem, buildImageUrl } from '../api/client';
 import { MATCH_THRESHOLD, HIGH_MATCH_THRESHOLD } from '../api/config';
-import { Screen, Header, Card, Section, SegmentedControl } from '../components/ui';
-import { PrimaryButton, SecondaryButton } from '../components/ui/Buttons';
+import { Card, SegmentedControl } from '../components/ui';
 import ImagePickerField from '../components/ImagePickerField';
 import SelectField from '../components/SelectField';
 import TextInput from '../components/TextInput';
 import MatchCard from '../components/MatchCard';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 type ReportType = 'lost' | 'found';
+type StepIndex = 0 | 1 | 2;
 
 type RouteParams = {
   Report: { type?: ReportType };
 };
 
+const STEPS = [
+  { key: 'photo', icon: 'camera' as const },
+  { key: 'location', icon: 'location' as const },
+  { key: 'details', icon: 'checkmark-circle' as const },
+];
+
 export default function ReportItemScreen() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RouteParams, 'Report'>>();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
+  const isRTL = language === 'ar';
   
   // Get initial type from navigation params
   const initialType = route.params?.type || 'lost';
   const [reportType, setReportType] = useState<ReportType>(initialType);
+  const [currentStep, setCurrentStep] = useState<StepIndex>(0);
+
+  // Animation values
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const stepOpacity = useRef(new Animated.Value(1)).current;
 
   // Update type when navigation params change
   useEffect(() => {
@@ -51,6 +72,16 @@ export default function ReportItemScreen() {
       setReportType(route.params.type);
     }
   }, [route.params?.type]);
+
+  // Animate progress bar
+  useEffect(() => {
+    Animated.spring(progressAnim, {
+      toValue: currentStep / (STEPS.length - 1),
+      useNativeDriver: false,
+      tension: 50,
+      friction: 10,
+    }).start();
+  }, [currentStep]);
 
   const [formData, setFormData] = useState<ItemFormData>({
     image: null,
@@ -67,72 +98,81 @@ export default function ReportItemScreen() {
 
   const isLost = reportType === 'lost';
   const accentColor = isLost ? colors.primary.dark : colors.primary.accent;
+  const gradientColors = isLost 
+    ? [colors.primary.dark, '#0D3847'] 
+    : [colors.primary.accent, '#1E9A8C'];
 
-  // Config based on type
-  const config = {
-    lost: {
-      title: t('lost_page_title'),
-      subtitle: t('lost_page_subtitle'),
-      icon: 'search-outline' as const,
-      photoLabel: t('lost_form_item_photo'),
-      whereLabel: t('lost_form_where_question'),
-      whenLabel: t('lost_form_when_question'),
-      wherePlaceholder: t('lost_form_location_type_placeholder'),
-      whenPlaceholder: t('lost_form_time_frame_placeholder'),
-      specificPlaceLabel: t('lost_form_specific_place'),
-      specificPlacePlaceholder: t('lost_form_specific_place_placeholder'),
-      descLabel: t('lost_form_notes_label'),
-      descPlaceholder: t('lost_form_notes_placeholder'),
-      submitText: t('lost_form_submit'),
-      submittingText: t('lost_form_submitting'),
-      modalTitle: t('modal_lost_title'),
-      modalSubtitle: t('modal_lost_subtitle'),
-      modalScanned: t('modal_lost_scanned'),
+  // Step configuration
+  const stepConfig = {
+    0: {
+      title: isLost ? t('lost_form_item_photo') : t('found_form_item_photo'),
+      subtitle: t('report_step1_subtitle') || 'التقط صورة واضحة للعنصر',
     },
-    found: {
-      title: t('found_page_title'),
-      subtitle: t('found_page_subtitle'),
-      icon: 'hand-left-outline' as const,
-      photoLabel: t('found_form_item_photo'),
-      whereLabel: t('found_form_where_question'),
-      whenLabel: t('found_form_when_question'),
-      wherePlaceholder: t('found_form_location_type_placeholder'),
-      whenPlaceholder: t('found_form_time_frame_placeholder'),
-      specificPlaceLabel: t('found_form_specific_place'),
-      specificPlacePlaceholder: t('found_form_specific_place_placeholder'),
-      descLabel: t('found_form_notes_label'),
-      descPlaceholder: t('found_form_notes_placeholder'),
-      submitText: t('found_form_submit'),
-      submittingText: t('found_form_submitting'),
-      modalTitle: t('modal_found_title'),
-      modalSubtitle: t('modal_found_subtitle'),
-      modalScanned: t('modal_found_scanned'),
+    1: {
+      title: t('detail_location'),
+      subtitle: t('report_step2_subtitle') || 'حدد مكان ووقت العثور/الفقدان',
+    },
+    2: {
+      title: t('report_step3_title') || 'تفاصيل إضافية',
+      subtitle: t('report_step3_subtitle') || 'أضف أي معلومات تساعد في التعرف',
     },
   };
 
-  const currentConfig = config[reportType];
+  // Navigate between steps with animation
+  const goToStep = (step: StepIndex) => {
+    const direction = step > currentStep ? 1 : -1;
+    
+    // Fade out
+    Animated.timing(stepOpacity, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentStep(step);
+      // Fade in
+      Animated.timing(stepOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
+  const canProceedFromStep = (step: StepIndex): boolean => {
+    switch (step) {
+      case 0:
+        return !!formData.image;
+      case 1:
+        return !!formData.where && !!formData.when;
+      case 2:
+        return true; // Optional step
+      default:
+        return false;
+    }
+  };
+
+  const handleNext = () => {
+    if (currentStep < 2 && canProceedFromStep(currentStep)) {
+      setError(null);
+      goToStep((currentStep + 1) as StepIndex);
+    } else if (currentStep === 2) {
+      handleSubmit();
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 0) {
+      goToStep((currentStep - 1) as StepIndex);
+    }
+  };
 
   const handleSubmit = async () => {
-    // Validation
-    if (!formData.image) {
-      setError(t('error_image_required'));
-      return;
-    }
-    if (!formData.where) {
-      setError(t('error_location_required'));
-      return;
-    }
-    if (!formData.when) {
-      setError(t('error_time_required'));
-      return;
-    }
-
     setIsSubmitting(true);
     setError(null);
 
     try {
       const payload = {
-        file: formData.image,
+        file: formData.image!,
         title: formData.description || `${isLost ? 'Lost' : 'Found'} item at ${formData.where}`,
         description: formData.description || undefined,
         locationType: formData.where,
@@ -145,7 +185,7 @@ export default function ReportItemScreen() {
       setMatches(response.matches);
       setShowSuccessModal(true);
 
-      // Invalidate history cache so Matches screen shows new data
+      // Invalidate history cache
       queryClient.invalidateQueries({ queryKey: ['history'] });
 
       // Reset form
@@ -156,6 +196,7 @@ export default function ReportItemScreen() {
         when: '',
         description: '',
       });
+      setCurrentStep(0);
     } catch (err) {
       console.error(`Error submitting ${reportType} item:`, err);
       setError(err instanceof Error ? err.message : t('error_generic'));
@@ -182,176 +223,253 @@ export default function ReportItemScreen() {
     status: matchResult.similarity >= HIGH_MATCH_THRESHOLD ? 'high' : 'possible',
   });
 
-  // Form validation state
-  const isFormValid = formData.image && formData.where && formData.when;
+  // Render step content
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 0:
+        return (
+          <View style={styles.stepContent}>
+            <ImagePickerField
+              value={formData.image}
+              onChange={(image) => setFormData(prev => ({ ...prev, image }))}
+              label=""
+              required
+              large
+            />
+            {!formData.image && (
+              <Text style={styles.stepHint}>
+                {t('report_photo_hint') || 'التقط صورة واضحة تظهر تفاصيل العنصر'}
+              </Text>
+            )}
+          </View>
+        );
+      
+      case 1:
+        return (
+          <View style={styles.stepContent}>
+            <SelectField
+              value={formData.where}
+              onChange={(where) => setFormData(prev => ({ ...prev, where }))}
+              options={whereOptions}
+              placeholder={isLost ? t('lost_form_location_type_placeholder') : t('found_form_location_type_placeholder')}
+              label={isLost ? t('lost_form_where_question') : t('found_form_where_question')}
+              required
+              icon={<Ionicons name="location" size={18} color={accentColor} />}
+            />
+            
+            <View style={styles.fieldSpacer} />
+            
+            <SelectField
+              value={formData.when}
+              onChange={(when) => setFormData(prev => ({ ...prev, when }))}
+              options={whenOptions}
+              placeholder={isLost ? t('lost_form_time_frame_placeholder') : t('found_form_time_frame_placeholder')}
+              label={isLost ? t('lost_form_when_question') : t('found_form_when_question')}
+              required
+              icon={<Ionicons name="time" size={18} color={accentColor} />}
+            />
+          </View>
+        );
+      
+      case 2:
+        return (
+          <View style={styles.stepContent}>
+            <TextInput
+              value={formData.specificPlace}
+              onChangeText={(specificPlace) => setFormData(prev => ({ ...prev, specificPlace }))}
+              placeholder={isLost ? t('lost_form_specific_place_placeholder') : t('found_form_specific_place_placeholder')}
+              label={isLost ? t('lost_form_specific_place') : t('found_form_specific_place')}
+              icon={<Ionicons name="pin-outline" size={18} color={colors.text.tertiary} />}
+            />
+            
+            <View style={styles.fieldSpacer} />
+            
+            <TextInput
+              value={formData.description}
+              onChangeText={(description) => setFormData(prev => ({ ...prev, description }))}
+              placeholder={isLost ? t('lost_form_notes_placeholder') : t('found_form_notes_placeholder')}
+              label={isLost ? t('lost_form_notes_label') : t('found_form_notes_label')}
+              multiline
+              numberOfLines={4}
+              icon={<Ionicons name="document-text-outline" size={18} color={colors.text.tertiary} />}
+            />
+            
+            <Text style={styles.optionalHint}>
+              {t('report_optional_hint') || 'هذه الحقول اختيارية لكنها تساعد في المطابقة'}
+            </Text>
+          </View>
+        );
+    }
+  };
 
-  // Calculate progress
-  const progress = [
-    formData.image ? 1 : 0,
-    formData.where && formData.when ? 1 : 0,
-    0, // Submit step
-  ].reduce((a, b) => a + b, 0);
-
-  const progressSteps = [
-    { key: 'photo', label: t('how_step1_title'), icon: 'camera-outline' as const },
-    { key: 'details', label: t('detail_location'), icon: 'location-outline' as const },
-    { key: 'submit', label: t('submit'), icon: 'checkmark-outline' as const },
-  ];
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   return (
-    <Screen
-      backgroundColor={colors.background.secondary}
-      statusBarStyle="dark-content"
-      keyboardAvoiding
-    >
-      {/* Header with type toggle */}
-      <View style={styles.headerContainer}>
-        <Header
-          title={currentConfig.title}
-          subtitle={currentConfig.subtitle}
-          icon={currentConfig.icon}
-          variant="transparent"
-        />
-        
-        {/* Type Toggle */}
-        <View style={styles.toggleContainer}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Gradient Header */}
+      <LinearGradient colors={gradientColors as [string, string]} style={styles.header}>
+        {/* Type Toggle at top */}
+        <View style={styles.typeToggle}>
           <SegmentedControl
             segments={[
               { 
                 key: 'lost', 
                 label: t('matches_lost_badge'),
-                icon: <Ionicons name="search-outline" size={14} color={reportType === 'lost' ? colors.text.white : colors.text.secondary} />
+                icon: <Ionicons name="search" size={16} color={reportType === 'lost' ? colors.text.white : colors.text.secondary} />
               },
               { 
                 key: 'found', 
                 label: t('matches_found_badge'),
-                icon: <Ionicons name="hand-left-outline" size={14} color={reportType === 'found' ? colors.text.white : colors.text.secondary} />
+                icon: <Ionicons name="hand-left" size={16} color={reportType === 'found' ? colors.text.white : colors.text.secondary} />
               },
             ]}
             selectedKey={reportType}
-            onSelect={(key: string) => setReportType(key as ReportType)}
+            onSelect={(key: string) => {
+              setReportType(key as ReportType);
+              // Reset to step 0 when changing type
+              if (currentStep !== 0) {
+                goToStep(0);
+              }
+            }}
             accentColor={accentColor}
           />
         </View>
-      </View>
 
-      {/* Progress Steps */}
-      <View style={styles.progressContainer}>
-        {progressSteps.map((step, index) => (
-          <React.Fragment key={step.key}>
-            <View style={styles.progressStep}>
-              <View style={[
-                styles.progressDot,
-                index < progress && { backgroundColor: accentColor },
-              ]}>
-                <Ionicons 
-                  name={step.icon} 
-                  size={14} 
-                  color={index < progress ? colors.text.white : colors.text.tertiary} 
-                />
+        {/* Step Indicator */}
+        <View style={styles.stepIndicatorContainer}>
+          <View style={styles.stepsRow}>
+            {STEPS.map((step, index) => (
+              <React.Fragment key={step.key}>
+                <TouchableOpacity
+                  style={[
+                    styles.stepDot,
+                    index <= currentStep && styles.stepDotActive,
+                    index === currentStep && styles.stepDotCurrent,
+                  ]}
+                  onPress={() => {
+                    // Allow going back to completed steps
+                    if (index < currentStep) {
+                      goToStep(index as StepIndex);
+                    }
+                  }}
+                  disabled={index > currentStep}
+                >
+                  <Ionicons 
+                    name={step.icon} 
+                    size={18} 
+                    color={index === currentStep ? accentColor : (index < currentStep ? colors.text.white : 'rgba(255,255,255,0.4)')} 
+                  />
+                </TouchableOpacity>
+                {index < STEPS.length - 1 && (
+                  <View style={[
+                    styles.stepLine,
+                    index < currentStep && styles.stepLineActive,
+                  ]} />
+                )}
+              </React.Fragment>
+            ))}
+          </View>
+          
+          {/* Step Title */}
+          <Text style={styles.stepTitle}>{stepConfig[currentStep].title}</Text>
+          <Text style={styles.stepSubtitle}>{stepConfig[currentStep].subtitle}</Text>
+        </View>
+
+        {/* Progress Bar */}
+        <View style={styles.progressBarContainer}>
+          <View style={styles.progressBarBg}>
+            <Animated.View 
+              style={[
+                styles.progressBarFill,
+                { width: progressWidth }
+              ]} 
+            />
+          </View>
+          <Text style={styles.progressText}>
+            {currentStep + 1} / {STEPS.length}
+          </Text>
+        </View>
+      </LinearGradient>
+
+      {/* Form Content */}
+      <KeyboardAvoidingView 
+        style={styles.formContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={100}
+      >
+        <Animated.View style={[styles.formContent, { opacity: stepOpacity }]}>
+          <Card variant="default" padding="lg" style={styles.formCard}>
+            {renderStepContent()}
+            
+            {/* Error Message */}
+            {error && (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={16} color={colors.status.error} />
+                <Text style={styles.errorText}>{error}</Text>
               </View>
-              <Text style={[
-                styles.progressLabel,
-                index < progress && styles.progressLabelActive,
-              ]}>
-                {step.label}
-              </Text>
-            </View>
-            {index < progressSteps.length - 1 && (
-              <View style={[
-                styles.progressLine,
-                index < progress - 1 && { backgroundColor: accentColor },
-              ]} />
             )}
-          </React.Fragment>
-        ))}
-      </View>
+          </Card>
+        </Animated.View>
 
-      {/* Form */}
-      <Section padded style={styles.formSection}>
-        <Card variant="default" padding="md">
-          {/* Image Upload */}
-          <ImagePickerField
-            value={formData.image}
-            onChange={(image) => setFormData(prev => ({ ...prev, image }))}
-            label={currentConfig.photoLabel}
-            required
-          />
-
-          {/* Location Select */}
-          <SelectField
-            value={formData.where}
-            onChange={(where) => setFormData(prev => ({ ...prev, where }))}
-            options={whereOptions}
-            placeholder={currentConfig.wherePlaceholder}
-            label={currentConfig.whereLabel}
-            required
-            icon={<Ionicons name="location" size={16} color={accentColor} />}
-          />
-
-          {/* Time Frame Select */}
-          <SelectField
-            value={formData.when}
-            onChange={(when) => setFormData(prev => ({ ...prev, when }))}
-            options={whenOptions}
-            placeholder={currentConfig.whenPlaceholder}
-            label={currentConfig.whenLabel}
-            required
-            icon={<Ionicons name="time" size={16} color={accentColor} />}
-          />
-
-          {/* Specific Place (Optional) */}
-          <TextInput
-            value={formData.specificPlace}
-            onChangeText={(specificPlace) => setFormData(prev => ({ ...prev, specificPlace }))}
-            placeholder={currentConfig.specificPlacePlaceholder}
-            label={currentConfig.specificPlaceLabel}
-            icon={<Ionicons name="pin-outline" size={16} color={colors.text.tertiary} />}
-          />
-
-          {/* Description (Optional) */}
-          <TextInput
-            value={formData.description}
-            onChangeText={(description) => setFormData(prev => ({ ...prev, description }))}
-            placeholder={currentConfig.descPlaceholder}
-            label={currentConfig.descLabel}
-            multiline
-            numberOfLines={3}
-            icon={<Ionicons name="document-text-outline" size={16} color={colors.text.tertiary} />}
-          />
-
-          {/* Error Message */}
-          {error && (
-            <View style={styles.errorContainer}>
-              <Ionicons name="alert-circle" size={16} color={colors.status.error} />
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
-          {/* Submit Button */}
-          {isLost ? (
-            <PrimaryButton
-              title={isSubmitting ? currentConfig.submittingText : currentConfig.submitText}
-              onPress={handleSubmit}
-              loading={isSubmitting}
-              disabled={isSubmitting || !isFormValid}
-              fullWidth
-              size="lg"
-              icon="sparkles"
-            />
+        {/* Bottom Navigation */}
+        <View style={[styles.bottomNav, { paddingBottom: insets.bottom + spacing.md }]}>
+          {/* Back Button */}
+          {currentStep > 0 ? (
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={handleBack}
+            >
+              <Ionicons 
+                name={isRTL ? "arrow-forward" : "arrow-back"} 
+                size={20} 
+                color={colors.text.secondary} 
+              />
+              <Text style={styles.backButtonText}>{t('back') || 'رجوع'}</Text>
+            </TouchableOpacity>
           ) : (
-            <SecondaryButton
-              title={isSubmitting ? currentConfig.submittingText : currentConfig.submitText}
-              onPress={handleSubmit}
-              loading={isSubmitting}
-              disabled={isSubmitting || !isFormValid}
-              fullWidth
-              size="lg"
-              icon="sparkles"
-            />
+            <View style={styles.backButtonPlaceholder} />
           )}
-        </Card>
-      </Section>
+
+          {/* Next/Submit Button */}
+          <TouchableOpacity
+            style={[
+              styles.nextButton,
+              { backgroundColor: accentColor },
+              (!canProceedFromStep(currentStep) && currentStep < 2) && styles.nextButtonDisabled,
+              isSubmitting && styles.nextButtonDisabled,
+            ]}
+            onPress={handleNext}
+            disabled={(!canProceedFromStep(currentStep) && currentStep < 2) || isSubmitting}
+          >
+            {isSubmitting ? (
+              <Text style={styles.nextButtonText}>
+                {isLost ? t('lost_form_submitting') : t('found_form_submitting')}
+              </Text>
+            ) : (
+              <>
+                <Text style={styles.nextButtonText}>
+                  {currentStep === 2 
+                    ? (isLost ? t('lost_form_submit') : t('found_form_submit'))
+                    : (t('next') || 'التالي')
+                  }
+                </Text>
+                {currentStep === 2 ? (
+                  <Ionicons name="sparkles" size={18} color={colors.text.white} />
+                ) : (
+                  <Ionicons 
+                    name={isRTL ? "arrow-back" : "arrow-forward"} 
+                    size={18} 
+                    color={colors.text.white} 
+                  />
+                )}
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
 
       {/* Success Modal */}
       <SuccessModal
@@ -361,13 +479,13 @@ export default function ReportItemScreen() {
           setShowSuccessModal(false);
           navigation.navigate('Matches' as never);
         }}
-        config={currentConfig}
+        isLost={isLost}
         matches={filteredMatches}
         convertToMatch={convertToMatch}
         accentColor={accentColor}
         t={t}
       />
-    </Screen>
+    </View>
   );
 }
 
@@ -376,7 +494,7 @@ function SuccessModal({
   visible,
   onClose,
   onViewMatches,
-  config,
+  isLost,
   matches,
   convertToMatch,
   accentColor,
@@ -385,12 +503,16 @@ function SuccessModal({
   visible: boolean;
   onClose: () => void;
   onViewMatches: () => void;
-  config: { modalTitle: string; modalSubtitle: string; modalScanned: string };
+  isLost: boolean;
   matches: MatchResult[];
   convertToMatch: (m: MatchResult) => Match;
   accentColor: string;
   t: (key: string) => string;
 }) {
+  const modalTitle = isLost ? t('modal_lost_title') : t('modal_found_title');
+  const modalSubtitle = isLost ? t('modal_lost_subtitle') : t('modal_found_subtitle');
+  const modalScanned = isLost ? t('modal_lost_scanned') : t('modal_found_scanned');
+
   return (
     <Modal
       visible={visible}
@@ -401,25 +523,28 @@ function SuccessModal({
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           {/* Modal Header */}
-          <View style={[styles.modalHeader, { backgroundColor: accentColor }]}>
+          <LinearGradient 
+            colors={[accentColor, accentColor + 'DD']} 
+            style={styles.modalHeader}
+          >
             <TouchableOpacity style={styles.modalClose} onPress={onClose}>
               <Ionicons name="close" size={24} color={colors.text.white} />
             </TouchableOpacity>
             <View style={styles.modalHeaderContent}>
               <View style={styles.modalIconContainer}>
-                <Ionicons name="checkmark-circle" size={32} color={accentColor} />
+                <Ionicons name="checkmark-circle" size={40} color={accentColor} />
               </View>
-              <Text style={styles.modalTitle}>{config.modalTitle}</Text>
-              <Text style={styles.modalSubtitle}>{config.modalSubtitle}</Text>
+              <Text style={styles.modalTitle}>{modalTitle}</Text>
+              <Text style={styles.modalSubtitle}>{modalSubtitle}</Text>
             </View>
-          </View>
+          </LinearGradient>
 
           {/* Modal Body */}
           <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-            <Text style={styles.modalText}>{config.modalScanned}</Text>
+            <Text style={styles.modalText}>{modalScanned}</Text>
 
             {/* Next Steps */}
-            <View style={[styles.nextStepsContainer, { backgroundColor: `${accentColor}10` }]}>
+            <View style={[styles.nextStepsContainer, { backgroundColor: `${accentColor}12` }]}>
               <Text style={styles.nextStepsTitle}>{t('modal_lost_what_next')}</Text>
               
               {[
@@ -443,7 +568,8 @@ function SuccessModal({
             {matches.length > 0 && (
               <>
                 <View style={[styles.matchesFoundBanner, { borderColor: accentColor }]}>
-                  <Text style={styles.matchesFoundText}>
+                  <Ionicons name="sparkles" size={20} color={accentColor} />
+                  <Text style={[styles.matchesFoundText, { color: accentColor }]}>
                     {t('modal_matches_found_message').replace('{count}', matches.length.toString())}
                   </Text>
                 </View>
@@ -470,6 +596,7 @@ function SuccessModal({
               onPress={onViewMatches}
             >
               <Text style={styles.modalPrimaryButtonText}>{t('modal_view_matches')}</Text>
+              <Ionicons name="arrow-forward" size={16} color={colors.text.white} />
             </TouchableOpacity>
           </View>
         </View>
@@ -479,55 +606,135 @@ function SuccessModal({
 }
 
 const styles = StyleSheet.create({
-  // Header
-  headerContainer: {
-    paddingBottom: spacing.sm,
-  },
-  toggleContainer: {
-    paddingHorizontal: layout.screenPadding,
-    marginTop: spacing.sm,
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.secondary,
   },
 
-  // Progress
-  progressContainer: {
+  // Header
+  header: {
+    paddingHorizontal: layout.screenPadding,
+    paddingBottom: spacing.lg,
+    borderBottomLeftRadius: borderRadius.xl,
+    borderBottomRightRadius: borderRadius.xl,
+  },
+  typeToggle: {
+    paddingTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+
+  // Step Indicator
+  stepIndicatorContainer: {
+    alignItems: 'center',
+    marginVertical: spacing.md,
+  },
+  stepsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: layout.screenPadding,
-    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
   },
-  progressStep: {
-    alignItems: 'center',
-  },
-  progressDot: {
-    width: 28,
-    height: 28,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.border.light,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
-  progressLabel: {
-    fontSize: typography.sizes.xs,
-    color: colors.text.tertiary,
-    fontWeight: typography.weights.medium,
-  },
-  progressLabelActive: {
-    color: colors.text.primary,
-  },
-  progressLine: {
+  stepDot: {
     width: 40,
-    height: 2,
-    backgroundColor: colors.border.light,
-    marginHorizontal: spacing.sm,
-    marginBottom: spacing.lg,
-    borderRadius: borderRadius.full,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  stepDotActive: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  stepDotCurrent: {
+    backgroundColor: colors.text.white,
+    borderColor: colors.text.white,
+    transform: [{ scale: 1.15 }],
+    ...shadows.md,
+  },
+  stepLine: {
+    width: 40,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginHorizontal: spacing.xs,
+    borderRadius: 2,
+  },
+  stepLineActive: {
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  stepTitle: {
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.bold,
+    color: colors.text.white,
+    textAlign: 'center',
+  },
+  stepSubtitle: {
+    fontSize: typography.sizes.sm,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
+
+  // Progress Bar
+  progressBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  progressBarBg: {
+    flex: 1,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: colors.text.white,
+    borderRadius: 2,
+  },
+  progressText: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
+    color: 'rgba(255,255,255,0.8)',
+    minWidth: 30,
+    textAlign: 'center',
   },
 
   // Form
-  formSection: {
-    marginTop: spacing.xs,
+  formContainer: {
+    flex: 1,
+  },
+  formContent: {
+    flex: 1,
+    padding: layout.screenPadding,
+    paddingTop: spacing.lg,
+  },
+  formCard: {
+    flex: 1,
+  },
+  stepContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  fieldSpacer: {
+    height: spacing.md,
+  },
+  stepHint: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  optionalHint: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+    fontStyle: 'italic',
   },
 
   // Error
@@ -537,7 +744,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.status.errorBg,
     padding: spacing.md,
     borderRadius: borderRadius.sm,
-    marginBottom: spacing.md,
+    marginTop: spacing.md,
     gap: spacing.sm,
   },
   errorText: {
@@ -546,10 +753,55 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
   },
 
+  // Bottom Navigation
+  bottomNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: layout.screenPadding,
+    paddingTop: spacing.md,
+    backgroundColor: colors.background.primary,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.xs,
+  },
+  backButtonText: {
+    fontSize: typography.sizes.md,
+    color: colors.text.secondary,
+    fontWeight: typography.weights.medium,
+  },
+  backButtonPlaceholder: {
+    width: 80,
+  },
+  nextButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.full,
+    gap: spacing.sm,
+    minWidth: 140,
+  },
+  nextButtonDisabled: {
+    opacity: 0.5,
+  },
+  nextButtonText: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.text.white,
+  },
+
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     padding: layout.screenPadding,
   },
@@ -560,7 +812,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   modalHeader: {
-    padding: spacing.lg,
+    padding: spacing.xl,
+    paddingTop: spacing.lg,
   },
   modalClose: {
     position: 'absolute',
@@ -574,23 +827,26 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
   },
   modalIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: borderRadius.full,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: colors.background.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
+    ...shadows.md,
   },
   modalTitle: {
-    fontSize: typography.sizes.lg,
+    fontSize: typography.sizes.xl,
     fontWeight: typography.weights.bold,
     color: colors.text.white,
     marginBottom: spacing.xs,
+    textAlign: 'center',
   },
   modalSubtitle: {
     fontSize: typography.sizes.sm,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.85)',
+    textAlign: 'center',
   },
   modalBody: {
     padding: spacing.lg,
@@ -599,32 +855,33 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     color: colors.text.secondary,
     marginBottom: spacing.md,
+    textAlign: 'center',
   },
   nextStepsContainer: {
     padding: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     marginBottom: spacing.md,
   },
   nextStepsTitle: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.md,
     fontWeight: typography.weights.bold,
     color: colors.text.primary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   nextStep: {
     flexDirection: 'row',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
     gap: spacing.sm,
   },
   nextStepNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: borderRadius.full,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
   nextStepNumberText: {
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     fontWeight: typography.weights.bold,
     color: colors.text.white,
   },
@@ -640,23 +897,26 @@ const styles = StyleSheet.create({
   nextStepDesc: {
     fontSize: typography.sizes.xs,
     color: colors.text.secondary,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   matchesFoundBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.primary.accentLight,
     borderWidth: 2,
     padding: spacing.md,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
   },
   matchesFoundText: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.md,
     fontWeight: typography.weights.bold,
-    color: colors.primary.dark,
     textAlign: 'center',
   },
   matchesPreview: {
-    marginTop: spacing.xs,
+    gap: spacing.sm,
   },
   modalFooter: {
     flexDirection: 'row',
@@ -668,23 +928,26 @@ const styles = StyleSheet.create({
   modalSecondaryButton: {
     flex: 1,
     paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     backgroundColor: colors.background.tertiary,
     alignItems: 'center',
   },
   modalSecondaryButtonText: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.md,
     fontWeight: typography.weights.semibold,
     color: colors.text.secondary,
   },
   modalPrimaryButton: {
     flex: 1,
+    flexDirection: 'row',
     paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
   },
   modalPrimaryButtonText: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.md,
     fontWeight: typography.weights.semibold,
     color: colors.text.white,
   },
